@@ -1,0 +1,42 @@
+name: Deploy Portfolio
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ubuntu
+          key: ${{ secrets.AWS_PRIVATE_KEY }}
+          port: 22
+          script: |
+            REMOTE_DIR=/home/ubuntu/AMANDEEP-PORTFOLIO
+            if [ ! -d "$REMOTE_DIR" ]; then
+              git clone https://github.com/${{ github.repository }}.git "$REMOTE_DIR"
+            fi
+            cd "$REMOTE_DIR"
+            if [ ! -d .git ]; then
+              rm -rf "$REMOTE_DIR"/*
+              git clone https://github.com/${{ github.repository }}.git "$REMOTE_DIR"
+              cd "$REMOTE_DIR"
+            else
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+            if command -v docker-compose >/dev/null 2>&1; then
+              sudo docker-compose down
+              sudo docker-compose up --build -d
+            else
+              sudo docker compose down
+              sudo docker compose up --build -d
+            fi
